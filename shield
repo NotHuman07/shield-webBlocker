@@ -1,0 +1,28 @@
+#!/bin/bash
+# The shield - Site Blocker
+
+HOSTS_FILE="/etc/hosts"
+BLOCK_URL="https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/porn/hosts"
+SAFE_BACKUP="$HOME/hosts.clean.bak"
+
+# Create the lifeboat (clean backup) if it's missing
+if [ ! -f "$SAFE_BACKUP" ]; then
+    echo -e "127.0.0.1\tlocalhost\n127.0.1.1\tFalcon\n\n::1\tip6-localhost ip6-loopback\nfe00::0\tip6-localnet\nff00::0\tip6-mcastprefix\nff02::1\tip6-allnodes\nff02::>
+fi
+
+case "$1" in
+    on)
+        echo "Updating blocklist and activating Shield..."
+        # We use $BLOCK_URL here to match the definition at the top
+        sudo curl -sL "$BLOCK_URL" -o "$HOSTS_FILE"
+        echo "Shield is now ACTIVE."
+        ;;
+    off)
+        echo "Restoring clean hosts file..."
+        sudo cp "$SAFE_BACKUP" "$HOSTS_FILE"
+        echo "Shield is now OFF."
+        ;;
+    *)
+        echo "Usage: shield [on|off]"
+        ;;
+esac

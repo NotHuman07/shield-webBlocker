@@ -1,28 +1,142 @@
 #!/bin/bash
-# The shield - Site Blocker
 
+# 1. Custom Master Lists
+CUSTOM_BLOCKER=(
+	# "example-site.com"
+	# exmaple: "Any adult site you want to block that isn't in Steven Black's list"
+)
+
+FOCUS_SITES=(
+	# "example-site.com (for focus mode only)"
+	# example: "twitter.com", "facebook.com", "youtube.com"
+)
+
+# 2. File Paths
 HOSTS_FILE="/etc/hosts"
-BLOCK_URL="https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/porn/hosts"
-SAFE_BACKUP="$HOME/hosts.clean.bak"
+BASE_FILE="/etc/hosts.base"
+ADULT_CACHE="/etc/hosts.adult"
+STATE_FILE="/tmp/shield_state"
+TIMER_FILE="/tmp/shield_timer.id"
 
-# Create the lifeboat (clean backup) if it's missing
-if [ ! -f "$SAFE_BACKUP" ]; then
-    echo -e "127.0.0.1\tlocalhost\n127.0.1.1\tFalcon\n\n::1\tip6-localhost ip6-loopback\nfe00::0\tip6-localnet\nff00::0\tip6-mcastprefix\nff02::1\tip6-allnodes\nff02::>
+# Ensure script is run as root
+if [ "$EUID" -ne 0 ]; then
+	echo "Error: Shield requires sudo privileges."
+	exit 1
 fi
 
-case "$1" in
-    on)
-        echo "Updating blocklist and activating Shield..."
-        # We use $BLOCK_URL here to match the definition at the top
-        sudo curl -sL "$BLOCK_URL" -o "$HOSTS_FILE"
-        echo "Shield is now ACTIVE."
-        ;;
-    off)
-        echo "Restoring clean hosts file..."
-        sudo cp "$SAFE_BACKUP" "$HOSTS_FILE"
-        echo "Shield is now OFF."
-        ;;
-    *)
-        echo "Usage: shield [on|off]"
-        ;;
-esac
+if [ ! -f "$BASE_FILE" ]; then
+    CURRENT_STATE=$(cat "$STATE_FILE" 2>/dev/null)
+    if [ "$CURRENT_STATE" == "on" ]; then
+        echo "Error: Cannot create base snapshot while Shield is ON. Run 'shield off' first."
+        exit 1
+    fi
+    echo "First time setup: saving current hosts file as base..."
+    cp "$HOSTS_FILE" "$BASE_FILE"
+fi
+
+# CORE FUNCTIONS
+flush_dns(){
+    resolvectl flush-caches 2>/dev/null 
+}
+unlock_hosts(){
+    chattr -i "$HOSTS_FILE" 2>/dev/null
+}
+lock_hosts(){
+    chattr +i "$HOSTS_FILE" 2>/dev/null
+}
+
+# COMMAND LOGIC
+if [ "$1" == "update" ]; then
+	echo "Building offline Adult Cache..."
+	unlock_hosts
+	
+	# Start with a fresh base file
+	cp "$BASE_FILE" "$ADULT_CACHE"
+
+    # Download Steven Black and append to cache
+    echo "Downloading Steven Black list..."
+    curl -s https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/porn/hosts >> "$ADULT_CACHE"
+
+    # Append Custom Adult Sites to cache
+	for site in "${CUSTOM_BLOCKER[@]}"; do
+	    echo "0.0.0.0 $site" >> "$ADULT_CACHE"
+	    echo "0.0.0.0 www.$site" >> "$ADULT_CACHE"
+	done
+
+	echo "Offline cache built successfully at $ADULT_CACHE."
+	exit 0
+
+elif [ "$1" == "off" ]; then
+    unlock_hosts
+    cp "$BASE_FILE" "$HOSTS_FILE"
+    echo "off" > "$STATE_FILE"
+    flush_dns
+    echo "Shield is OFF. Network restored to normal."
+    exit 0
+
+elif [ "$1" == "on" ]; then
+    if [ ! -f "$ADULT_CACHE" ]; then
+	    echo "Error: Adult cache not found. Please run 'sudo shield update' first."
+	    exit 1
+    fi
+    unlock_hosts
+    cp "$ADULT_CACHE" "$HOSTS_FILE"
+    echo "on" > "$STATE_FILE"
+    flush_dns
+    echo "Shield is ON."
+    exit 0
+
+elif [ "$1" == "focus" ]; then
+	if [ -z "$2" ]; then 
+	    echo "Error: You must provide a time in minutes. Example: shield focus 60"
+	    exit 1
+    fi
+
+    if [ ! -f "$ADULT_CACHE" ]; then
+	    echo "Error: Adult cache not found. Please run 'sudo shield update' first."
+	    exit 1
+    fi
+
+    MINUTES=$2
+    SECONDS=$(($MINUTES * 60))
+
+    TIMER_ID=$RANDOM
+    echo $TIMER_ID > "$TIMER_FILE"
+
+    echo "Initiating HARDCORE Focus Mode for $MINUTES minutes."
+    unlock_hosts
+
+    # Start with Adult Cache so adult sites stay blocked during focus
+    cp "$ADULT_CACHE" "$HOSTS_FILE"
+
+    for site in "${FOCUS_SITES[@]}"; do
+	    echo "0.0.0.0 $site" >> "$HOSTS_FILE"
+	    echo "0.0.0.0 www.$site" >> "$HOSTS_FILE"
+    done
+
+    lock_hosts
+    flush_dns
+    echo "Hosts file locked. Background timer started."
+
+    (
+	    sleep $SECONDS
+	    if [ "$(cat "$TIMER_FILE" 2>/dev/null)" == "$TIMER_ID" ]; then
+	        chattr -i "$HOSTS_FILE" 2>/dev/null
+		    PREV_STATE=$(cat "$STATE_FILE" 2>/dev/null)
+		    if [ "$PREV_STATE" == "on" ]; then
+		        cp "$ADULT_CACHE" "$HOSTS_FILE"
+		    else
+		        cp "$BASE_FILE" "$HOSTS_FILE"
+		    fi
+	        flush_dns
+        fi
+    ) &
+    exit 0
+
+else
+	echo "Usage:"
+	echo "  shield update     (Caches blocklists)"
+	echo "  shield on         (Blocks adult content)"
+	echo "  shield off        (Restores default network)"
+	echo "  shield focus [m]  (Blocks focus + adult sites)"
+fi

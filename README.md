@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Shield V3.0 - Hardcore Focus & DNS Blocker
 
 Shield is a system-level utility for Linux that manages DNS sinkholing via the `/etc/hosts` file. Version 3.0 introduces a deterministic state-based architecture.
@@ -7,6 +8,10 @@ Shield is a system-level utility for Linux that manages DNS sinkholing via the `
 * **Inheritance-Based Blocking:** Focus mode automatically inherits all adult-site blocks from the local cache.
 * **Process Tracking:** Uses unique Timer IDs to prevent race conditions from overlapping background timers.
 * **File Immutability:** Leverages `chattr +i` to prevent manual bypasses during focus sessions.
+=======
+##  Shield v1.0 (DNS Sinkhole)
+A lightweight command-line utility to toggle a system-wide DNS blocklist by manipulating the `/etc/hosts` file.
+>>>>>>> 86c0c9675e4b50c065f324aded23baf8513ee321
 
 ## 🛠 Commands
 * `sudo shield update`: Builds the offline adult-site cache.

@@ -1,15 +1,16 @@
-# Linux Net-Tools: NetSpy & Shield
+# Shield V3.0 - Hardcore Focus & DNS Blocker
 
-A collection of custom Bash scripts for local network reconnaissance and system-level DNS traffic blocking.
+Shield is a system-level utility for Linux that manages DNS sinkholing via the `/etc/hosts` file. Version 3.0 introduces a deterministic state-based architecture.
 
-##  Shield v1.0 (DNS Sinkhole)
-A lightweight command-line utility to toggle a system-wide DNS blocklist by manipulating the `/etc/hosts` file.
+## 🚀 Key Features (V3.0)
+* **Deterministic State Management:** Uses a permanent base file (`/etc/hosts.base`) to prevent state corruption.
+* **Inheritance-Based Blocking:** Focus mode automatically inherits all adult-site blocks from the local cache.
+* **Process Tracking:** Uses unique Timer IDs to prevent race conditions from overlapping background timers.
+* **File Immutability:** Leverages `chattr +i` to prevent manual bypasses during focus sessions.
 
-**Features:**
-* Blocks designated domains system-wide.
-* Flushes DNS cache automatically via `systemd-resolved`.
-* Easy toggle (`on`/`off`) for rapid deployment.
+## 🛠 Commands
+* `sudo shield update`: Builds the offline adult-site cache.
+* `sudo shield on`: Activates global protection.
+* `sudo shield focus [minutes]`: Initiates a hardcore lock.
+* `sudo shield off`: Restores the system to its base state.
 
-## Requirements
-* Linux environment (Tested on Linux Mint/Ubuntu)
-* Root (`sudo`) privileges
